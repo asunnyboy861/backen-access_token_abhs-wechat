@@ -1,0 +1,45 @@
+# Development files
+test/
+test-direct.js
+server.js
+.env.local
+.env.example
+
+# Documentation
+README.md
+QUICK_START.md
+*.md
+
+# Build tools
+tsconfig.json
+.nvmrc
+
+# Scripts
+deploy.bat
+deploy.sh
+
+# IDE and OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Backup files
+*.bak
+*.backup
+*.old
+
+# Source maps (if not needed in production)
+*.map
+
+# Development dependencies
+node_modules/.cache/
