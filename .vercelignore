@@ -11,7 +11,6 @@ QUICK_START.md
 *.md
 
 # Build tools
-tsconfig.json
 .nvmrc
 
 # Scripts
