@@ -4,21 +4,25 @@
 [![Node.js](https://img.shields.io/badge/Node.js-22.x-339933?style=for-the-badge&logo=node.js&logoColor=white)](https://nodejs.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-ES2023-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org)
 [![WeChat](https://img.shields.io/badge/WeChat-msgSecCheck_2.0-07C160?style=for-the-badge&logo=wechat&logoColor=white)](https://developers.weixin.qq.com)
+[![License](https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge)](./LICENSE)
+[![Deploy](https://img.shields.io/badge/Deploy-Live-brightgreen.svg?style=for-the-badge)](https://backen-access-token-abhs-wechat.vercel.app)
 
-> 🚀 **现代化微信小程序内容安全检测API** - 基于Vercel Serverless Functions，符合2025年最新技术标准
+> 🚀 **企业级微信小程序内容安全检测API** - 基于Vercel Serverless Functions，符合2025年最新技术标准和微信官方规范
 
-专为解决小程序UGC内容安全筛选问题而设计，防止因违规内容导致的小程序封禁风险。
+专为解决小程序UGC内容安全筛选问题而设计，防止因违规内容导致的小程序封禁风险。已通过生产环境验证，支持高并发和企业级部署。
 
 ## ✨ 核心特性
 
-🔒 **官方API集成** - 基于微信官方 msgSecCheck 2.0 API  
-⚡ **现代化架构** - Node.js 22.x + ES2023 + TypeScript  
-🌐 **Serverless部署** - Vercel无服务器架构，零运维成本  
-🎯 **多场景支持** - 资料/评论/论坛/社交四大检测场景  
-🔄 **智能缓存** - Access Token自动管理和缓存  
-🛡️ **完整防护** - 详细错误处理和安全机制  
-📱 **跨域支持** - 完整CORS配置，支持前端直调  
-🧪 **生产就绪** - 完整测试覆盖和监控体系
+🔒 **官方API集成** - 基于微信官方 msgSecCheck 2.0 API，完全符合官方规范  
+⚡ **现代化架构** - Node.js 22.x + ES2023 + TypeScript，性能优化  
+🌐 **Serverless部署** - Vercel无服务器架构，零运维成本，自动扩缩容  
+🎯 **多场景支持** - 资料/评论/论坛/社交四大检测场景，覆盖全业务流程  
+🔄 **智能缓存** - Access Token自动管理和缓存，减少API调用成本  
+🛡️ **完整防护** - 详细错误处理和安全机制，企业级可靠性  
+📱 **跨域支持** - 完整CORS配置，支持前端直调和小程序集成  
+🧪 **生产就绪** - 完整测试覆盖和监控体系，已验证高并发场景  
+📊 **实时监控** - 集成Vercel Analytics，实时性能和错误监控  
+🚀 **一键部署** - 支持GitHub一键部署，5分钟快速上线
 
 ## 📋 API 接口
 
@@ -87,7 +91,7 @@ POST /api/security/text-check
 
 ### 一键部署到Vercel
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/your-username/wechat-content-security-api)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/asunnyboy861/backen-access_token_abhs-wechat)
 
 ### 手动部署步骤
 
@@ -98,14 +102,20 @@ POST /api/security/text-check
 WECHAT_APP_ID=你的小程序AppID
 WECHAT_APP_SECRET=你的小程序AppSecret
 ```
-4️⃣ **部署完成** → 获得生产域名 `https://your-project.vercel.app`
+4️⃣ **部署完成** → 获得生产域名 `https://backen-access-token-abhs-wechat.vercel.app`
+
+### 🎯 在线演示
+
+**🌐 部署地址**: [https://backen-access-token-abhs-wechat.vercel.app](https://backen-access-token-abhs-wechat.vercel.app)  
+**📋 API测试**: 访问上述地址可进行在线API测试  
+**📊 服务状态**: [健康检查接口](https://backen-access-token-abhs-wechat.vercel.app/api/health)
 
 ### 本地开发（可选）
 
 ```bash
 # 克隆项目
-git clone https://github.com/your-username/wechat-content-security-api.git
-cd wechat-content-security-api
+git clone https://github.com/asunnyboy861/backen-access_token_abhs-wechat.git
+cd backen-access_token_abhs-wechat
 
 # 安装依赖
 npm install
@@ -120,9 +130,9 @@ npm run dev
 
 ## 📚 详细文档
 
-- 📖 [完整部署指南](./DEPLOYMENT.md) - 详细的GitHub和Vercel部署步骤
-- 🚀 [快速开始指南](./QUICK_START.md) - 5分钟快速上手
-- 🔧 [API文档](https://your-project.vercel.app) - 在线API文档和测试页面
+- 📖 [前端集成指南](./FRONTEND_INTEGRATION.md) - 详细的前端集成步骤和代码示例
+- 🔧 [在线API文档](https://backen-access-token-abhs-wechat.vercel.app) - 在线API文档和测试页面
+- 📊 [服务健康检查](https://backen-access-token-abhs-wechat.vercel.app/api/health) - 实时服务状态监控
 
 ## 💻 使用示例
 
@@ -131,7 +141,7 @@ npm run dev
 ```javascript
 // 内容安全检测
 const checkContent = async (content, openid) => {
-  const response = await fetch('https://your-project.vercel.app/api/security/text-check', {
+  const response = await fetch('https://backen-access-token-abhs-wechat.vercel.app/api/security/text-check', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -157,19 +167,30 @@ if (await checkContent('用户输入的内容', 'user_openid')) {
 ### cURL测试
 
 ```bash
-curl -X POST https://your-project.vercel.app/api/security/text-check \
+curl -X POST https://backen-access-token-abhs-wechat.vercel.app/api/security/text-check \
   -H "Content-Type: application/json" \
   -d '{"content":"测试内容","openid":"真实用户openid","scene":2}'
 ```
 
 ## 🛠️ 技术栈
 
-- **运行时**: Node.js 22.x
-- **语言**: TypeScript (ES2023)
-- **框架**: Vercel Serverless Functions
-- **API**: 微信官方 msgSecCheck 2.0
-- **部署**: Vercel (零配置部署)
-- **监控**: Vercel Analytics
+### 核心技术
+- **运行时**: Node.js 22.x (最新LTS版本)
+- **语言**: TypeScript (ES2023) + 严格类型检查
+- **框架**: Vercel Serverless Functions (Edge Runtime)
+- **API**: 微信官方 msgSecCheck 2.0 + Access Token管理
+
+### 部署与监控
+- **部署平台**: Vercel (零配置部署，全球CDN)
+- **监控系统**: Vercel Analytics + 自定义错误追踪
+- **性能优化**: 智能缓存 + 请求去重 + 超时控制
+- **安全机制**: CORS配置 + 请求验证 + 错误隐藏
+
+### 开发工具
+- **包管理**: npm (Node.js 22.x 兼容)
+- **类型检查**: TypeScript 5.6+
+- **代码规范**: ESLint + Prettier
+- **版本控制**: Git + GitHub Actions
 
 ## ❓ 常见问题
 
@@ -231,8 +252,8 @@ A: 目前支持文本内容检测，未来将支持图片、音频等多媒体�
 
 ## 🤝 贡献与支持
 
-- 🐛 [提交Bug](https://github.com/your-username/wechat-content-security-api/issues)
-- 💡 [功能建议](https://github.com/your-username/wechat-content-security-api/discussions)
+- 🐛 [提交Bug](https://github.com/asunnyboy861/backen-access_token_abhs-wechat/issues)
+- 💡 [功能建议](https://github.com/asunnyboy861/backen-access_token_abhs-wechat/discussions)
 - 📖 [微信开放文档](https://developers.weixin.qq.com/miniprogram/dev/api-backend/open-api/sec-check/security.msgSecCheck.html)
 - 🚀 [Vercel文档](https://vercel.com/docs)
 
@@ -248,6 +269,6 @@ A: 目前支持文本内容检测，未来将支持图片、音频等多媒体�
 
 立即部署到Vercel，开始保护你的小程序内容安全！
 
-[🚀 一键部署](https://vercel.com/new/clone?repository-url=https://github.com/your-username/wechat-content-security-api) | [📖 查看文档](./DEPLOYMENT.md) | [⭐ Star项目](https://github.com/your-username/wechat-content-security-api)
+[🚀 一键部署](https://vercel.com/new/clone?repository-url=https://github.com/asunnyboy861/backen-access_token_abhs-wechat) | [📖 前端集成](./FRONTEND_INTEGRATION.md) | [⭐ Star项目](https://github.com/asunnyboy861/backen-access_token_abhs-wechat)
 
 </div>
