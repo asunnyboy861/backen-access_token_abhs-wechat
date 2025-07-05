@@ -136,3 +136,7 @@ secrets.json
 
 # Edge runtime
 .edge/
+
+# Frontend integration guide with custom domain
+# This file contains domain-specific configurations
+FRONTEND_INTEGRATION.md
