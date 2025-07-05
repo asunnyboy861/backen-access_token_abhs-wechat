@@ -8,20 +8,20 @@
 
 ### 1. 获取微信访问令牌
 
-**接口地址：** `GET /api/get-access-token`
+**接口地址：** `GET /api/auth/token`
 
 **功能：** 获取微信小程序的access_token，用于调用微信API
 
 **请求示例：**
 ```javascript
 // 使用 fetch
-const response = await fetch('https://backen-access-token-abhs-wechat.vercel.app/api/get-access-token');
+const response = await fetch('https://backen-access-token-abhs-wechat.vercel.app/api/auth/token');
 const data = await response.json();
 console.log(data);
 
 // 使用 axios
 import axios from 'axios';
-const { data } = await axios.get('https://backen-access-token-abhs-wechat.vercel.app/api/get-access-token');
+const { data } = await axios.get('https://backen-access-token-abhs-wechat.vercel.app/api/auth/token');
 console.log(data);
 ```
 
@@ -29,9 +29,11 @@ console.log(data);
 ```json
 {
   "success": true,
-  "access_token": "your_access_token_here",
-  "expires_in": 7200,
-  "message": "Access token retrieved successfully"
+  "data": {
+    "access_token": "93_XsYnw3IPiz1Z4igJFXx9JpnDsxpRVSFdltJSZpZOOF3NhhUOrDtl3jz_LadrypZZvoiyNBLivGPVniwZHR7m1owYNjUoJp30SYlnyz8tAhn_VlaeFShYL2lHFMUJPDgADACIW",
+    "expires_in": 7192,
+    "from_cache": true
+  }
 }
 ```
 
@@ -46,7 +48,7 @@ console.log(data);
 
 ### 2. 内容安全检测
 
-**接口地址：** `POST /api/msg-sec-check`
+**接口地址：** `POST /api/security/text-check`
 
 **功能：** 检测文本内容是否违规
 
@@ -60,7 +62,7 @@ console.log(data);
 **请求示例：**
 ```javascript
 // 使用 fetch
-const response = await fetch('https://backen-access-token-abhs-wechat.vercel.app/api/msg-sec-check', {
+const response = await fetch('https://backen-access-token-abhs-wechat.vercel.app/api/security/text-check', {
   method: 'POST',
   headers: {
     'Content-Type': 'application/json'
@@ -72,7 +74,7 @@ const response = await fetch('https://backen-access-token-abhs-wechat.vercel.app
 const data = await response.json();
 
 // 使用 axios
-const { data } = await axios.post('https://backen-access-token-abhs-wechat.vercel.app/api/msg-sec-check', {
+const { data } = await axios.post('https://backen-access-token-abhs-wechat.vercel.app/api/security/text-check', {
   content: '要检测的文本内容'
 });
 ```
@@ -122,7 +124,7 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://backen-acc
 // 获取访问令牌
 export const getAccessToken = async () => {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/get-access-token`);
+    const response = await fetch(`${API_BASE_URL}/api/auth/token`);
     const data = await response.json();
     
     if (!data.success) {
@@ -139,7 +141,7 @@ export const getAccessToken = async () => {
 // 内容安全检测
 export const checkContentSecurity = async (content) => {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/msg-sec-check`, {
+    const response = await fetch(`${API_BASE_URL}/api/security/text-check`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
