@@ -18,7 +18,12 @@
 
 ## 🚀 微信小程序快速接入
 
-### 第一步：配置服务器域名
+> 📋 **框架支持**: 本指南同时支持原生微信小程序和uni-app+Vue3框架
+> 🎯 **选择指南**: 根据您的项目框架选择对应的接入方式
+
+### 📱 原生微信小程序接入
+
+#### 第一步：配置服务器域名
 
 在微信公众平台 > 开发管理 > 开发设置 > 服务器域名中添加：
 
@@ -26,12 +31,12 @@
 request合法域名: https://backend-abhs.zzoutuo.com
 ```
 
-### 第二步：在小程序中创建API配置文件
+#### 第二步：在小程序中创建API配置文件
 
 创建 `utils/api.js` 文件：
 
 ```javascript
-// utils/api.js - API配置文件
+// utils/api.js - API配置文件（原生小程序）
 const API_CONFIG = {
   BASE_URL: 'https://backend-abhs.zzoutuo.com',
   ENDPOINTS: {
@@ -64,6 +69,1180 @@ module.exports = {
   apiRequest
 };
 ```
+
+---
+
+## 🎨 uni-app + Vue3 框架接入
+
+> 🚀 **推荐框架**: uni-app + Vue3 + TypeScript + Pinia
+> 📦 **包管理**: 支持 npm/yarn/pnpm
+> 🔧 **开发工具**: HBuilderX 或 VS Code
+
+### 🛠️ 项目配置
+
+#### 第一步：安装依赖
+
+```bash
+# 安装Pinia状态管理（推荐）
+npm install pinia
+
+# 安装类型定义（TypeScript项目）
+npm install @types/wechat-miniprogram --save-dev
+```
+
+#### 第二步：创建API配置文件
+
+创建 `src/utils/api.ts` 文件：
+
+```typescript
+// src/utils/api.ts - uni-app API配置文件
+export interface ApiResponse<T = any> {
+  success: boolean;
+  data: T;
+  message: string;
+  errcode?: number;
+}
+
+export interface LoginResponse {
+  openid: string;
+  unionid?: string;
+  session_key?: string;
+}
+
+export interface TextCheckResponse {
+  result: {
+    suggest: 'pass' | 'review' | 'risky';
+    label: number;
+  };
+  detail?: Array<{
+    strategy: string;
+    errcode: number;
+    suggest: string;
+    label: number;
+    keyword?: string;
+    prob?: number;
+  }>;
+  trace_id: string;
+}
+
+export const API_CONFIG = {
+  BASE_URL: 'https://backend-abhs.zzoutuo.com',
+  ENDPOINTS: {
+    HEALTH: '/api/health',
+    TOKEN: '/api/auth/token',
+    TEXT_CHECK: '/api/security/text-check',
+    CODE2SESSION: '/api/auth/code2session'
+  }
+} as const;
+
+// uni-app请求封装（符合2025年最新标准）
+export const apiRequest = <T = any>(
+  endpoint: string,
+  options: UniApp.RequestOptions = {}
+): Promise<ApiResponse<T>> => {
+  return new Promise((resolve, reject) => {
+    uni.request({
+      url: `${API_CONFIG.BASE_URL}${endpoint}`,
+      method: options.method || 'GET',
+      data: options.data || {},
+      header: {
+        'content-type': 'application/json',
+        ...options.header
+      },
+      timeout: options.timeout || 10000,
+      enableHttp2: true, // 启用HTTP/2（微信小程序2.10.4+支持）
+      enableQuic: true,   // 启用QUIC协议（微信小程序2.10.4+支持）
+      enableCache: false, // 根据需要启用缓存
+      success: (res) => {
+        // 更严格的状态码检查
+        if (res.statusCode >= 200 && res.statusCode < 300) {
+          resolve(res.data as ApiResponse<T>);
+        } else {
+          const errorMsg = typeof res.data === 'object' && res.data?.message 
+            ? res.data.message 
+            : `HTTP ${res.statusCode}`;
+          reject(new Error(errorMsg));
+        }
+      },
+      fail: (error) => {
+        console.error('API请求失败:', error);
+        reject(new Error(error.errMsg || '网络请求失败'));
+      }
+    });
+  });
+};
+
+// 专用API方法
+export const loginApi = {
+  // 用户登录
+  code2Session: (code: string) => 
+    apiRequest<LoginResponse>(API_CONFIG.ENDPOINTS.CODE2SESSION, {
+      method: 'POST',
+      data: { code }
+    }),
+  
+  // 获取Access Token
+  getToken: () => 
+    apiRequest<{ access_token: string; expires_in: number }>(API_CONFIG.ENDPOINTS.TOKEN),
+  
+  // 内容安全检测
+  textCheck: (content: string, openid: string, scene: number = 2) =>
+    apiRequest<TextCheckResponse>(API_CONFIG.ENDPOINTS.TEXT_CHECK, {
+      method: 'POST',
+      data: { content, openid, scene, version: 2 }
+    }),
+  
+  // 健康检查
+  health: () => 
+    apiRequest<{ status: string; timestamp: number }>(API_CONFIG.ENDPOINTS.HEALTH)
+};
+```
+
+#### 第三步：创建Pinia状态管理
+
+创建 `src/stores/user.ts` 文件：
+
+```typescript
+// src/stores/user.ts - 用户状态管理
+import { defineStore } from 'pinia';
+import { ref, computed, readonly } from 'vue';
+import { loginApi, type LoginResponse } from '@/utils/api';
+
+export interface UserInfo {
+  openid: string;
+  unionid?: string;
+  loginTime: number;
+  fromCache: boolean;
+}
+
+export const useUserStore = defineStore('user', () => {
+  // 响应式状态（符合Vue3 Composition API最新标准）
+  const userInfo = ref<UserInfo | null>(null);
+  const isLogging = ref(false);
+  const lastLoginCheck = ref(0);
+  
+  // 计算属性（使用readonly确保不可变性）
+  const isLoggedIn = computed(() => {
+    return !!userInfo.value?.openid;
+  });
+  
+  const isLoginValid = computed(() => {
+    if (!userInfo.value) return false;
+    // 检查登录是否在24小时内（可配置）
+    const now = Date.now();
+    const validDuration = 24 * 60 * 60 * 1000; // 24小时
+    return (now - userInfo.value.loginTime) < validDuration;
+  });
+  
+  // 用户显示信息（脱敏处理）
+  const maskedOpenId = computed(() => {
+    if (!userInfo.value?.openid) return '';
+    const openid = userInfo.value.openid;
+    return openid.length > 8 ? `${openid.substring(0, 8)}***` : openid;
+  });
+  
+  const maskedUnionId = computed(() => {
+    if (!userInfo.value?.unionid) return '';
+    const unionid = userInfo.value.unionid;
+    return unionid.length > 8 ? `${unionid.substring(0, 8)}***` : unionid;
+  });
+  
+  // 方法
+  const checkSession = (): Promise<boolean> => {
+    return new Promise((resolve) => {
+      uni.checkSession({
+        success: () => resolve(true),
+        fail: () => resolve(false)
+      });
+    });
+  };
+  
+  const loadUserFromStorage = (): UserInfo | null => {
+    try {
+      const openid = uni.getStorageSync('openid');
+      const unionid = uni.getStorageSync('unionid');
+      const loginTime = uni.getStorageSync('loginTime');
+      
+      if (openid && loginTime) {
+        return {
+          openid,
+          unionid,
+          loginTime: Number(loginTime),
+          fromCache: true
+        };
+      }
+    } catch (error) {
+      console.error('读取本地用户信息失败:', error);
+    }
+    return null;
+  };
+  
+  const saveUserToStorage = (user: UserInfo) => {
+    try {
+      uni.setStorageSync('openid', user.openid);
+      uni.setStorageSync('loginTime', user.loginTime);
+      if (user.unionid) {
+        uni.setStorageSync('unionid', user.unionid);
+      }
+    } catch (error) {
+      console.error('保存用户信息失败:', error);
+    }
+  };
+  
+  const clearUserStorage = () => {
+    try {
+      uni.removeStorageSync('openid');
+      uni.removeStorageSync('unionid');
+      uni.removeStorageSync('loginTime');
+    } catch (error) {
+      console.error('清除用户信息失败:', error);
+    }
+  };
+  
+  const performLogin = async (): Promise<UserInfo> => {
+    return new Promise((resolve, reject) => {
+      uni.login({
+        success: async (loginRes) => {
+          if (!loginRes.code) {
+            reject(new Error('获取登录凭证失败'));
+            return;
+          }
+          
+          try {
+            console.log('🔑 获取到登录凭证:', loginRes.code.substring(0, 10) + '***');
+            
+            const response = await loginApi.code2Session(loginRes.code);
+            
+            if (response.success && response.data.openid) {
+              const user: UserInfo = {
+                openid: response.data.openid,
+                unionid: response.data.unionid,
+                loginTime: Date.now(),
+                fromCache: false
+              };
+              
+              userInfo.value = user;
+              saveUserToStorage(user);
+              
+              console.log('✅ 登录成功:', user.openid.substring(0, 8) + '***');
+              resolve(user);
+            } else {
+              const errorMsg = response.message || '登录失败';
+              reject(new Error(errorMsg));
+            }
+          } catch (error: any) {
+            console.error('❌ 登录请求失败:', error);
+            reject(error);
+          }
+        },
+        fail: (error) => {
+          console.error('❌ uni.login失败:', error);
+          reject(new Error('微信登录服务异常'));
+        }
+      });
+    });
+  };
+  
+  const ensureLogin = async (force = false): Promise<UserInfo> => {
+    // 防止重复登录
+    if (isLogging.value) {
+      throw new Error('正在登录中，请稍候');
+    }
+    
+    try {
+      isLogging.value = true;
+      
+      // 如果不强制登录，先检查缓存
+      if (!force) {
+        const cachedUser = loadUserFromStorage();
+        if (cachedUser && isLoginValid.value) {
+          const sessionValid = await checkSession();
+          if (sessionValid) {
+            userInfo.value = cachedUser;
+            console.log('✅ 使用缓存登录信息');
+            return cachedUser;
+          }
+        }
+      }
+      
+      // 执行新登录
+      const user = await performLogin();
+      return user;
+      
+    } finally {
+      isLogging.value = false;
+    }
+  };
+  
+  const logout = () => {
+    userInfo.value = null;
+    clearUserStorage();
+    console.log('🚪 用户已登出');
+  };
+  
+  const retryLogin = async (maxRetries = 3): Promise<UserInfo> => {
+    for (let i = 0; i < maxRetries; i++) {
+      try {
+        return await ensureLogin(true);
+      } catch (error: any) {
+        console.log(`🔄 登录重试 ${i + 1}/${maxRetries}:`, error.message);
+        
+        // 某些错误不需要重试
+        if (error.message.includes('账号存在风险') || 
+            error.message.includes('登录凭证已失效')) {
+          throw error;
+        }
+        
+        if (i === maxRetries - 1) {
+          throw new Error(`登录失败，已重试${maxRetries}次: ${error.message}`);
+        }
+        
+        // 延迟重试
+        await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
+      }
+    }
+    throw new Error('登录重试失败');
+  };
+  
+  return {
+    // 响应式状态
+    userInfo: readonly(userInfo),
+    isLogging: readonly(isLogging),
+    lastLoginCheck: readonly(lastLoginCheck),
+    
+    // 计算属性
+    isLoggedIn,
+    isLoginValid,
+    maskedOpenId,
+    maskedUnionId,
+    
+    // 方法
+    ensureLogin,
+    logout,
+    retryLogin,
+    checkSession,
+    loadUserFromStorage
+  };
+});
+```
+
+#### 第四步：创建登录组合式函数
+
+创建 `src/composables/useLogin.ts` 文件：
+
+```typescript
+// src/composables/useLogin.ts - 登录组合式函数
+import { ref, computed } from 'vue';
+import { useUserStore } from '@/stores/user';
+
+export const useLogin = () => {
+  const userStore = useUserStore();
+  const loading = ref(false);
+  const error = ref<string | null>(null);
+  
+  // 计算属性
+  const isLoggedIn = computed(() => userStore.isLoggedIn);
+  const userInfo = computed(() => userStore.userInfo);
+  
+  // 登录方法
+  const login = async (showLoading = true) => {
+    try {
+      loading.value = true;
+      error.value = null;
+      
+      if (showLoading) {
+        uni.showLoading({ title: '登录中...', mask: true });
+      }
+      
+      const user = await userStore.ensureLogin();
+      
+      if (showLoading) {
+        uni.hideLoading();
+        uni.showToast({
+          title: user.fromCache ? '登录验证成功' : '登录成功',
+          icon: 'success'
+        });
+      }
+      
+      return user;
+      
+    } catch (err: any) {
+      error.value = err.message || '登录失败';
+      
+      if (showLoading) {
+        uni.hideLoading();
+        uni.showToast({
+          title: error.value,
+          icon: 'none',
+          duration: 3000
+        });
+      }
+      
+      throw err;
+    } finally {
+      loading.value = false;
+    }
+  };
+  
+  // 重试登录
+  const retryLogin = async () => {
+    try {
+      loading.value = true;
+      error.value = null;
+      
+      uni.showLoading({ title: '重新登录中...', mask: true });
+      
+      const user = await userStore.retryLogin();
+      
+      uni.hideLoading();
+      uni.showToast({
+        title: '登录成功',
+        icon: 'success'
+      });
+      
+      return user;
+      
+    } catch (err: any) {
+      error.value = err.message || '登录失败';
+      
+      uni.hideLoading();
+      uni.showModal({
+        title: '登录失败',
+        content: error.value,
+        showCancel: false
+      });
+      
+      throw err;
+    } finally {
+      loading.value = false;
+    }
+  };
+  
+  // 登出
+  const logout = () => {
+    uni.showModal({
+      title: '确认登出',
+      content: '确定要退出登录吗？',
+      success: (res) => {
+        if (res.confirm) {
+          userStore.logout();
+          uni.showToast({
+            title: '已退出登录',
+            icon: 'success'
+          });
+        }
+      }
+    });
+  };
+  
+  // 确保登录态（用于需要登录的操作）
+  const ensureLogin = async () => {
+    if (!isLoggedIn.value) {
+      await login();
+    }
+    return userInfo.value;
+  };
+  
+  return {
+    // 状态
+    loading,
+    error,
+    isLoggedIn,
+    userInfo,
+    
+    // 方法
+    login,
+    retryLogin,
+    logout,
+    ensureLogin
+  };
+};
+```
+
+#### 第五步：创建登录组件
+
+创建 `src/components/LoginButton.vue` 文件：
+
+```vue
+<!-- src/components/LoginButton.vue - 登录按钮组件 -->
+<template>
+  <view class="login-container">
+    <!-- 已登录状态 -->
+    <view v-if="isLoggedIn" class="user-info">
+      <view class="status-indicator">
+        <text class="status-icon">✅</text>
+        <text class="status-text">已登录</text>
+      </view>
+      <view class="user-details">
+        <text class="openid">ID: {{ maskedOpenId }}</text>
+        <text v-if="userInfo?.unionid" class="unionid">UnionID: {{ maskedUnionId }}</text>
+      </view>
+      <button 
+        class="logout-btn" 
+        size="mini" 
+        @click="handleLogout"
+        :disabled="loading"
+      >
+        退出登录
+      </button>
+    </view>
+    
+    <!-- 未登录状态 -->
+    <view v-else class="login-prompt">
+      <view class="prompt-text">
+        <text class="warning-icon">⚠️</text>
+        <text>需要登录后才能使用完整功能</text>
+      </view>
+      <button 
+        class="login-btn"
+        type="primary"
+        @click="handleLogin"
+        :loading="loading"
+        :disabled="loading"
+      >
+        {{ loading ? '登录中...' : '立即登录' }}
+      </button>
+      
+      <!-- 错误提示 -->
+      <view v-if="error" class="error-message">
+        <text class="error-icon">❌</text>
+        <text class="error-text">{{ error }}</text>
+        <button 
+          class="retry-btn"
+          size="mini"
+          @click="handleRetry"
+          :disabled="loading"
+        >
+          重试
+        </button>
+      </view>
+    </view>
+  </view>
+</template>
+
+<script setup lang="ts">
+// Vue3 Composition API（2025年最新标准）
+import { useLogin } from '@/composables/useLogin';
+import { useUserStore } from '@/stores/user';
+
+// 组合式API - 登录功能
+const { 
+  loading, 
+  error, 
+  isLoggedIn, 
+  userInfo, 
+  login, 
+  retryLogin, 
+  logout 
+} = useLogin();
+
+// 用户状态管理
+const userStore = useUserStore();
+
+// 使用store中的脱敏数据（避免重复计算）
+const { maskedOpenId, maskedUnionId } = userStore;
+
+// 事件处理
+const handleLogin = async () => {
+  try {
+    await login();
+  } catch (error) {
+    console.error('登录失败:', error);
+  }
+};
+
+const handleRetry = async () => {
+  try {
+    await retryLogin();
+  } catch (error) {
+    console.error('重试登录失败:', error);
+  }
+};
+
+const handleLogout = () => {
+  logout();
+};
+</script>
+
+<style scoped>
+.login-container {
+  padding: 20rpx;
+  border-radius: 12rpx;
+  background: #f8f9fa;
+  margin: 20rpx;
+}
+
+.user-info {
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+}
+
+.status-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+}
+
+.status-icon {
+  font-size: 28rpx;
+}
+
+.status-text {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #28a745;
+}
+
+.user-details {
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+  padding: 16rpx;
+  background: #fff;
+  border-radius: 8rpx;
+  border: 1px solid #e9ecef;
+}
+
+.openid, .unionid {
+  font-size: 24rpx;
+  color: #6c757d;
+  font-family: monospace;
+}
+
+.logout-btn {
+  background: #dc3545;
+  color: white;
+  border: none;
+  border-radius: 6rpx;
+}
+
+.login-prompt {
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+  text-align: center;
+}
+
+.prompt-text {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8rpx;
+  margin-bottom: 16rpx;
+}
+
+.warning-icon {
+  font-size: 28rpx;
+}
+
+.login-btn {
+  background: #007bff;
+  color: white;
+  border: none;
+  border-radius: 8rpx;
+  padding: 16rpx;
+  font-size: 32rpx;
+}
+
+.error-message {
+  display: flex;
+  flex-direction: column;
+  gap: 12rpx;
+  padding: 16rpx;
+  background: #f8d7da;
+  border: 1px solid #f5c6cb;
+  border-radius: 8rpx;
+  color: #721c24;
+}
+
+.error-icon {
+  font-size: 24rpx;
+}
+
+.error-text {
+  font-size: 28rpx;
+  line-height: 1.4;
+}
+
+.retry-btn {
+  background: #ffc107;
+  color: #212529;
+  border: none;
+  border-radius: 6rpx;
+  margin-top: 8rpx;
+}
+</style>
+```
+
+### 🎯 uni-app使用示例
+
+#### 1. 在main.ts中配置Pinia
+
+```typescript
+// src/main.ts - uni-app + Vue3 入口配置（2025年最新标准）
+import { createSSRApp } from 'vue';
+import { createPinia } from 'pinia';
+import App from './App.vue';
+
+export function createApp() {
+  const app = createSSRApp(App);
+  
+  // 配置Pinia状态管理
+  const pinia = createPinia();
+  
+  // 开发环境下启用Pinia devtools
+  if (process.env.NODE_ENV === 'development') {
+    // @ts-ignore
+    app.config.globalProperties.$pinia = pinia;
+  }
+  
+  app.use(pinia);
+  
+  return {
+    app,
+    pinia
+  };
+}
+```
+
+#### 2. 在页面中使用
+
+```vue
+<!-- src/pages/index/index.vue -->
+<template>
+  <view class="container">
+    <view class="header">
+      <text class="title">uni-app + Vue3 示例</text>
+    </view>
+    
+    <!-- 登录组件 -->
+    <LoginButton />
+    
+    <!-- 功能区域 -->
+    <view v-if="isLoggedIn" class="features">
+      <button @click="testHealthCheck" :loading="healthLoading">
+        健康检查
+      </button>
+      
+      <button @click="testTextCheck" :loading="textCheckLoading">
+        内容检测
+      </button>
+    </view>
+    
+    <!-- 结果显示 -->
+    <view v-if="result" class="result">
+      <text class="result-title">API调用结果：</text>
+      <text class="result-content">{{ result }}</text>
+    </view>
+  </view>
+</template>
+
+<script setup lang="ts">
+import { ref } from 'vue';
+import { useLogin } from '@/composables/useLogin';
+import { loginApi } from '@/utils/api';
+import LoginButton from '@/components/LoginButton.vue';
+
+// 组合式API
+const { isLoggedIn, userInfo, ensureLogin } = useLogin();
+
+// 响应式数据
+const healthLoading = ref(false);
+const textCheckLoading = ref(false);
+const result = ref('');
+
+// 健康检查
+const testHealthCheck = async () => {
+  try {
+    healthLoading.value = true;
+    const response = await loginApi.health();
+    result.value = JSON.stringify(response, null, 2);
+    
+    uni.showToast({
+      title: '健康检查成功',
+      icon: 'success'
+    });
+  } catch (error: any) {
+    uni.showToast({
+      title: error.message || '健康检查失败',
+      icon: 'none'
+    });
+  } finally {
+    healthLoading.value = false;
+  }
+};
+
+// 内容检测
+const testTextCheck = async () => {
+  try {
+    // 确保已登录
+    await ensureLogin();
+    
+    textCheckLoading.value = true;
+    const response = await loginApi.textCheck(
+      '这是一段测试内容',
+      userInfo.value!.openid
+    );
+    result.value = JSON.stringify(response, null, 2);
+    
+    uni.showToast({
+      title: '内容检测完成',
+      icon: 'success'
+    });
+  } catch (error: any) {
+    uni.showToast({
+      title: error.message || '内容检测失败',
+      icon: 'none'
+    });
+  } finally {
+    textCheckLoading.value = false;
+  }
+};
+</script>
+
+<style scoped>
+.container {
+  padding: 40rpx;
+}
+
+.header {
+  text-align: center;
+  margin-bottom: 40rpx;
+}
+
+.title {
+  font-size: 48rpx;
+  font-weight: bold;
+  color: #333;
+}
+
+.features {
+  display: flex;
+  flex-direction: column;
+  gap: 20rpx;
+  margin: 40rpx 0;
+}
+
+.features button {
+  padding: 20rpx;
+  border-radius: 8rpx;
+  background: #007bff;
+  color: white;
+  border: none;
+}
+
+.result {
+  margin-top: 40rpx;
+  padding: 20rpx;
+  background: #f8f9fa;
+  border-radius: 8rpx;
+}
+
+.result-title {
+  font-weight: bold;
+  margin-bottom: 16rpx;
+  display: block;
+}
+
+.result-content {
+  font-family: monospace;
+  font-size: 24rpx;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+</style>
+```
+
+## 📊 uni-app vs 原生小程序对比
+
+| 特性 | uni-app + Vue3 | 原生微信小程序 |
+|------|----------------|----------------|
+| **API调用** | `uni.request` | `wx.request` |
+| **存储方式** | `uni.getStorageSync` | `wx.getStorageSync` |
+| **状态管理** | Pinia + Composition API | 全局变量 + Page data |
+| **组件化** | Vue3 SFC组件 | 原生组件 |
+| **TypeScript** | 完整支持 | 基础支持 |
+| **代码复用** | 高（跨平台） | 低（仅小程序） |
+| **开发体验** | 现代化 | 传统 |
+| **性能** | 略有损耗 | 原生性能 |
+
+## 🎯 最佳实践建议
+
+### uni-app + Vue3 开发建议
+
+1. **项目结构**
+   ```
+   src/
+   ├── components/          # 公共组件
+   │   └── LoginButton.vue
+   ├── composables/         # 组合式函数
+   │   └── useLogin.ts
+   ├── stores/              # Pinia状态管理
+   │   └── user.ts
+   ├── utils/               # 工具函数
+   │   └── api.ts
+   ├── pages/               # 页面
+   └── main.ts              # 入口文件
+   ```
+
+2. **TypeScript配置（2025年最新标准）**
+   ```json
+   // tsconfig.json
+   {
+     "compilerOptions": {
+       "target": "ES2022",
+       "module": "ESNext",
+       "moduleResolution": "bundler",
+       "strict": true,
+       "jsx": "preserve",
+       "esModuleInterop": true,
+       "allowSyntheticDefaultImports": true,
+       "skipLibCheck": true,
+       "forceConsistentCasingInFileNames": true,
+       "useDefineForClassFields": true,
+       "baseUrl": ".",
+       "paths": {
+         "@/*": ["./src/*"]
+       },
+       "types": [
+         "@dcloudio/types",
+         "@types/wechat-miniprogram"
+       ]
+     },
+     "include": [
+       "src/**/*.ts",
+       "src/**/*.d.ts",
+       "src/**/*.tsx",
+       "src/**/*.vue"
+     ],
+     "exclude": [
+       "node_modules",
+       "dist",
+       "**/*.js"
+     ]
+   }
+   ```
+
+3. **环境配置**
+   ```typescript
+   // src/env.d.ts - 环境变量类型声明
+   /// <reference types="vite/client" />
+   /// <reference types="@dcloudio/types" />
+   
+   interface ImportMetaEnv {
+     readonly VITE_API_BASE_URL: string
+     readonly VITE_APP_TITLE: string
+     readonly VITE_APP_ENV: 'development' | 'production' | 'test'
+   }
+   
+   interface ImportMeta {
+     readonly env: ImportMetaEnv
+   }
+   ```
+
+4. **微信小程序最新API特性（2025年）**
+   ```typescript
+   // 利用最新的微信小程序API特性
+   export const enhancedApiRequest = <T = any>(
+     endpoint: string,
+     options: UniApp.RequestOptions = {}
+   ): Promise<ApiResponse<T>> => {
+     return new Promise((resolve, reject) => {
+       uni.request({
+         url: `${API_CONFIG.BASE_URL}${endpoint}`,
+         method: options.method || 'GET',
+         data: options.data || {},
+         header: {
+           'content-type': 'application/json',
+           ...options.header
+         },
+         timeout: options.timeout || 10000,
+         // 2025年微信小程序最新特性
+         enableHttp2: true,        // HTTP/2支持
+         enableQuic: true,         // QUIC协议支持
+         enableCache: false,       // HTTP缓存
+         enableProfile: true,      // 性能分析
+         useHighPerformanceMode: true, // 高性能模式
+         // 网络优化
+         enableHttpDNS: false,     // HttpDNS（可选）
+         forceCellularNetwork: false, // 强制蜂窝网络
+         redirect: 'follow',       // 重定向策略
+         success: (res) => {
+           // 性能监控
+           if (res.profile && process.env.NODE_ENV === 'development') {
+             console.log('🚀 API性能数据:', {
+               url: endpoint,
+               duration: res.profile.fetchStart ? 
+                 Date.now() - res.profile.fetchStart : 0,
+               statusCode: res.statusCode
+             });
+           }
+           
+           if (res.statusCode >= 200 && res.statusCode < 300) {
+             resolve(res.data as ApiResponse<T>);
+           } else {
+             const errorMsg = typeof res.data === 'object' && res.data?.message 
+               ? res.data.message 
+               : `HTTP ${res.statusCode}`;
+             reject(new Error(errorMsg));
+           }
+         },
+         fail: (error) => {
+           console.error('❌ API请求失败:', {
+             endpoint,
+             error: error.errMsg,
+             timestamp: new Date().toISOString()
+           });
+           reject(new Error(error.errMsg || '网络请求失败'));
+         }
+       });
+     });
+   };
+   ```
+
+5. **错误处理与性能优化**
+   ```typescript
+   // src/utils/errorHandler.ts - 统一错误处理
+   export class ApiError extends Error {
+     constructor(
+       message: string,
+       public code?: number,
+       public data?: any
+     ) {
+       super(message);
+       this.name = 'ApiError';
+     }
+   }
+   
+   export const handleApiError = (error: any): string => {
+     if (error instanceof ApiError) {
+       return error.message;
+     }
+     
+     if (error.errMsg) {
+       return error.errMsg;
+     }
+     
+     return error.message || '未知错误';
+   };
+   
+   // src/utils/performance.ts - 性能优化工具
+   export const debounce = <T extends (...args: any[]) => any>(
+     func: T,
+     wait: number
+   ): T => {
+     let timeout: NodeJS.Timeout;
+     return ((...args: any[]) => {
+       clearTimeout(timeout);
+       timeout = setTimeout(() => func.apply(this, args), wait);
+     }) as T;
+   };
+   
+   export const throttle = <T extends (...args: any[]) => any>(
+     func: T,
+     limit: number
+   ): T => {
+     let inThrottle: boolean;
+     return ((...args: any[]) => {
+       if (!inThrottle) {
+         func.apply(this, args);
+         inThrottle = true;
+         setTimeout(() => inThrottle = false, limit);
+       }
+     }) as T;
+   };
+   ```
+
+6. **环境配置最佳实践**
+   ```typescript
+   // src/config/env.ts - 环境配置
+   export const ENV_CONFIG = {
+     development: {
+       API_BASE_URL: 'http://localhost:3000',
+       DEBUG: true,
+       LOG_LEVEL: 'debug'
+     },
+     production: {
+       API_BASE_URL: 'https://backend-abhs.zzoutuo.com',
+       DEBUG: false,
+       LOG_LEVEL: 'error'
+     }
+   } as const;
+   
+   export const getCurrentEnv = () => {
+     // #ifdef MP-WEIXIN
+     return ENV_CONFIG.production;
+     // #endif
+     
+     // #ifdef H5
+     return process.env.NODE_ENV === 'production' 
+       ? ENV_CONFIG.production 
+       : ENV_CONFIG.development;
+     // #endif
+   };
+   ```
+
+### 迁移指南
+
+如果你已有原生小程序代码，可以按以下步骤迁移到uni-app + Vue3：
+
+1. **API调用迁移**
+   ```javascript
+   // 原生小程序
+   wx.request({
+     url: 'https://api.example.com',
+     method: 'POST',
+     data: { key: 'value' },
+     success: (res) => console.log(res),
+     fail: (err) => console.error(err)
+   });
+   
+   // uni-app
+   uni.request({
+     url: 'https://api.example.com',
+     method: 'POST',
+     data: { key: 'value' },
+     success: (res) => console.log(res),
+     fail: (err) => console.error(err)
+   });
+   ```
+
+2. **页面结构迁移**
+   ```javascript
+   // 原生小程序 - index.js
+   Page({
+     data: {
+       userInfo: null,
+       loading: false
+     },
+     onLoad() {
+       this.checkLogin();
+     },
+     checkLogin() {
+       // 登录逻辑
+     }
+   });
+   ```
+   
+   ```vue
+   <!-- uni-app - index.vue -->
+   <script setup lang="ts">
+   import { ref, onMounted } from 'vue';
+   import { useLogin } from '@/composables/useLogin';
+   
+   const { userInfo, loading, ensureLogin } = useLogin();
+   
+   onMounted(() => {
+     ensureLogin();
+   });
+   </script>
+   ```
+
+---
+
+## 📱 原生微信小程序接入指南
 
 ### 第三步：使用API服务
 

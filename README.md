@@ -5,11 +5,17 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-ES2023-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org)
 [![WeChat](https://img.shields.io/badge/WeChat-API_2025-07C160?style=for-the-badge&logo=wechat&logoColor=white)](https://developers.weixin.qq.com)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge)](./LICENSE)
-[![Deploy](https://img.shields.io/badge/Deploy-Live-brightgreen.svg?style=for-the-badge)](https://backen-access-token-abhs-wechat.vercel.app)
+[![Deploy](https://img.shields.io/badge/Deploy-Live-brightgreen.svg?style=for-the-badge)](https://backend-abhs.zzoutuo.com)
 
 > 🚀 **企业级微信小程序后端API服务** - 基于Vercel Serverless Functions，符合2025年最新技术标准和微信官方规范
 
 集成微信小程序用户登录(code2Session)和内容安全检测功能，为小程序提供完整的后端API支持。专为解决小程序用户认证和UGC内容安全筛选问题而设计，防止因违规内容导致的小程序封禁风险。已通过生产环境验证，支持高并发和企业级部署。
+
+**🌟 2025年最新特性**：
+- ⚡ **智能缓存系统** - Access Token自动管理，提前5分钟刷新
+- 🔒 **安全增强** - 完整的错误码处理和用户友好提示
+- 📱 **前端集成优化** - 支持uni-app+Vue3和原生小程序
+- 🛡️ **企业级可靠性** - 重试机制、性能监控、错误追踪
 
 ## ✨ 核心特性
 
@@ -151,13 +157,13 @@ POST /api/security/text-check
 WECHAT_APP_ID=你的小程序AppID
 WECHAT_APP_SECRET=你的小程序AppSecret
 ```
-4️⃣ **部署完成** → 获得生产域名 `https://backen-access-token-abhs-wechat.vercel.app`
+4️⃣ **部署完成** → 获得生产域名 `https://backend-abhs.zzoutuo.com`
 
 ### 🎯 在线演示
 
-**🌐 部署地址**: [https://backen-access-token-abhs-wechat.vercel.app](https://backen-access-token-abhs-wechat.vercel.app)  
+**🌐 部署地址**: [https://backend-abhs.zzoutuo.com](https://backend-abhs.zzoutuo.com)  
 **📋 API测试**: 访问上述地址可进行在线API测试  
-**📊 服务状态**: [健康检查接口](https://backen-access-token-abhs-wechat.vercel.app/api/health)
+**📊 服务状态**: [健康检查接口](https://backend-abhs.zzoutuo.com/api/health)
 
 ### 本地开发（可选）
 
@@ -179,9 +185,11 @@ npm run dev
 
 ## 📚 详细文档
 
-- 📖 [前端集成指南](./FRONTEND_INTEGRATION.md) - 详细的前端集成步骤和代码示例
-- 🔧 [在线API文档](https://backen-access-token-abhs-wechat.vercel.app) - 在线API文档和测试页面
-- 📊 [服务健康检查](https://backen-access-token-abhs-wechat.vercel.app/api/health) - 实时服务状态监控
+- 📖 [前端集成指南](./FRONTEND_INTEGRATION.md) - 详细的前端集成步骤和代码示例（2025年最新版）
+- 🔧 [在线API文档](https://backend-abhs.zzoutuo.com) - 在线API文档和测试页面
+- 📊 [服务健康检查](https://backend-abhs.zzoutuo.com/api/health) - 实时服务状态监控
+- 🎯 [uni-app+Vue3集成](./FRONTEND_INTEGRATION.md#uni-app--vue3-框架接入) - 现代化前端框架集成
+- 📱 [原生小程序集成](./FRONTEND_INTEGRATION.md#原生微信小程序接入指南) - 传统小程序开发集成
 
 ## 💻 使用示例
 
@@ -198,7 +206,7 @@ const wxLogin = async () => {
     }
     
     // 2. 调用后端code2session接口
-    const response = await fetch('https://backen-access-token-abhs-wechat.vercel.app/api/auth/code2session', {
+    const response = await fetch('https://backend-abhs.zzoutuo.com/api/auth/code2session', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ code: loginRes.code })
@@ -232,15 +240,16 @@ wxLogin().then(userInfo => {
 ### 内容安全检测
 
 ```javascript
-// 内容安全检测
+// 内容安全检测（2025年最新版本）
 const checkContent = async (content, openid) => {
-  const response = await fetch('https://backen-access-token-abhs-wechat.vercel.app/api/security/text-check', {
+  const response = await fetch('https://backend-abhs.zzoutuo.com/api/security/text-check', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       content,
       openid,
       scene: 2, // 评论场景
+      version: 2, // 使用msgSecCheck 2.0
       title: '用户评论'
     })
   });
@@ -261,18 +270,35 @@ if (await checkContent('用户输入的内容', 'user_openid')) {
 
 ```bash
 # 测试微信小程序登录接口
-curl -X POST https://backen-access-token-abhs-wechat.vercel.app/api/auth/code2session \
+curl -X POST https://backend-abhs.zzoutuo.com/api/auth/code2session \
   -H "Content-Type: application/json" \
   -d '{"code":"wx.login()获取的真实code"}'
 
-# 测试内容安全检测接口
-curl -X POST https://backen-access-token-abhs-wechat.vercel.app/api/security/text-check \
+# 测试内容安全检测接口（2025年最新版本）
+curl -X POST https://backend-abhs.zzoutuo.com/api/security/text-check \
   -H "Content-Type: application/json" \
-  -d '{"content":"测试内容","openid":"真实用户openid","scene":2}'
+  -d '{"content":"测试内容","openid":"真实用户openid","scene":2,"version":2}'
+
+# 测试获取Access Token接口
+curl -X GET https://backend-abhs.zzoutuo.com/api/auth/token
 
 # 测试健康检查接口
-curl -X GET https://backen-access-token-abhs-wechat.vercel.app/api/health
+curl -X GET https://backend-abhs.zzoutuo.com/api/health
 ```
+
+## 🚀 2025年新特性亮点
+
+### 🎯 前端集成优化
+- **🔥 uni-app + Vue3 支持** - 完整的Composition API集成，支持TypeScript
+- **📱 原生小程序优化** - 企业级登录态管理，智能重试机制
+- **⚡ Pinia状态管理** - 现代化状态管理，支持响应式和计算属性
+- **🛡️ 安全增强** - 用户信息脱敏，完整的错误处理
+
+### 🔧 API服务升级
+- **🎯 智能缓存系统** - Access Token自动管理，提前5分钟刷新
+- **📊 性能监控** - 实时API调用监控和错误追踪
+- **🔒 安全机制** - 完整的错误码处理和用户友好提示
+- **⚡ HTTP/2 支持** - 新增QUIC、性能分析等现代化特性
 
 ## 🛠️ 技术栈
 
@@ -280,7 +306,13 @@ curl -X GET https://backen-access-token-abhs-wechat.vercel.app/api/health
 - **运行时**: Node.js 22.x (最新LTS版本)
 - **语言**: TypeScript (ES2023) + 严格类型检查
 - **框架**: Vercel Serverless Functions (Edge Runtime)
-- **API**: 微信官方 msgSecCheck 2.0 + Access Token管理
+- **API**: 微信官方 msgSecCheck 2.0 + Access Token智能管理
+
+### 前端技术栈
+- **现代框架**: uni-app + Vue3 + Composition API
+- **状态管理**: Pinia (Vue3官方推荐)
+- **类型支持**: TypeScript 5.6+ 完整类型声明
+- **构建工具**: Vite + ES2022 模块化
 
 ### 部署与监控
 - **部署平台**: Vercel (零配置部署，全球CDN)
