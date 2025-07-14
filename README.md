@@ -1,19 +1,20 @@
-# 🛡️ 微信内容安全API - 2025版
+# 🛡️ 微信小程序后端API服务 - 2025版
 
 [![Vercel](https://img.shields.io/badge/Vercel-000000?style=for-the-badge&logo=vercel&logoColor=white)](https://vercel.com)
 [![Node.js](https://img.shields.io/badge/Node.js-22.x-339933?style=for-the-badge&logo=node.js&logoColor=white)](https://nodejs.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-ES2023-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org)
-[![WeChat](https://img.shields.io/badge/WeChat-msgSecCheck_2.0-07C160?style=for-the-badge&logo=wechat&logoColor=white)](https://developers.weixin.qq.com)
+[![WeChat](https://img.shields.io/badge/WeChat-API_2025-07C160?style=for-the-badge&logo=wechat&logoColor=white)](https://developers.weixin.qq.com)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge)](./LICENSE)
 [![Deploy](https://img.shields.io/badge/Deploy-Live-brightgreen.svg?style=for-the-badge)](https://backen-access-token-abhs-wechat.vercel.app)
 
-> 🚀 **企业级微信小程序内容安全检测API** - 基于Vercel Serverless Functions，符合2025年最新技术标准和微信官方规范
+> 🚀 **企业级微信小程序后端API服务** - 基于Vercel Serverless Functions，符合2025年最新技术标准和微信官方规范
 
-专为解决小程序UGC内容安全筛选问题而设计，防止因违规内容导致的小程序封禁风险。已通过生产环境验证，支持高并发和企业级部署。
+集成微信小程序用户登录(code2Session)和内容安全检测功能，为小程序提供完整的后端API支持。专为解决小程序用户认证和UGC内容安全筛选问题而设计，防止因违规内容导致的小程序封禁风险。已通过生产环境验证，支持高并发和企业级部署。
 
 ## ✨ 核心特性
 
-🔒 **官方API集成** - 基于微信官方 msgSecCheck 2.0 API，完全符合官方规范  
+🔐 **用户登录认证** - 基于微信官方 code2Session API，安全可靠的用户身份验证  
+🔒 **内容安全检测** - 基于微信官方 msgSecCheck 2.0 API，完全符合官方规范  
 ⚡ **现代化架构** - Node.js 22.x + ES2023 + TypeScript，性能优化  
 🌐 **Serverless部署** - Vercel无服务器架构，零运维成本，自动扩缩容  
 🎯 **多场景支持** - 资料/评论/论坛/社交四大检测场景，覆盖全业务流程  
@@ -31,15 +32,63 @@
 GET /api/health
 ```
 
-### 2. 获取 Access Token
+### 2. 微信小程序用户登录
+```
+POST /api/auth/code2session
+```
+
+### 3. 获取 Access Token
 ```
 GET /api/auth/token
 ```
 
-### 3. 文本内容安全检测
+### 4. 文本内容安全检测
 ```
 POST /api/security/text-check
 ```
+
+## 🔐 微信小程序登录接口
+
+**接口地址**: `POST /api/auth/code2session`
+
+**功能说明**: 将微信小程序前端通过 `wx.login()` 获取的临时登录凭证 `code` 换取用户的 `openid` 和 `session_key`，符合2025年微信小程序最新官方规范。
+
+**请求参数**:
+```json
+{
+  "code": "微信小程序wx.login()获取的临时登录凭证"
+}
+```
+
+**响应示例**:
+```json
+{
+  "success": true,
+  "openid": "用户唯一标识",
+  "session_key": "会话密钥",
+  "unionid": "用户在开放平台的唯一标识（可选）",
+  "message": "登录成功"
+}
+```
+
+**错误响应**:
+```json
+{
+  "success": false,
+  "error": "WeChat API Error",
+  "errcode": 40029,
+  "errmsg": "invalid code",
+  "message": "登录凭证无效，请重新登录"
+}
+```
+
+**常见错误码**:
+- `40029`: code 无效（已使用或过期）
+- `45011`: API 调用太频繁，请稍后再试
+- `40013`: AppID 无效
+- `40125`: AppSecret 无效
+
+## 🔒 文本内容安全检测接口
 
 **接口地址**: `POST /api/security/text-check`
 
@@ -136,7 +185,51 @@ npm run dev
 
 ## 💻 使用示例
 
-### JavaScript/小程序调用
+### 微信小程序登录流程
+
+```javascript
+// 微信小程序登录
+const wxLogin = async () => {
+  try {
+    // 1. 获取登录凭证
+    const loginRes = await wx.login();
+    if (!loginRes.code) {
+      throw new Error('获取登录凭证失败');
+    }
+    
+    // 2. 调用后端code2session接口
+    const response = await fetch('https://backen-access-token-abhs-wechat.vercel.app/api/auth/code2session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code: loginRes.code })
+    });
+    
+    const result = await response.json();
+    
+    if (result.success) {
+      // 3. 保存用户信息
+      wx.setStorageSync('openid', result.openid);
+      wx.setStorageSync('session_key', result.session_key);
+      console.log('✅ 登录成功:', result.openid);
+      return result;
+    } else {
+      throw new Error(result.message || '登录失败');
+    }
+  } catch (error) {
+    console.error('❌ 登录失败:', error.message);
+    throw error;
+  }
+};
+
+// 使用示例
+wxLogin().then(userInfo => {
+  console.log('用户信息:', userInfo);
+}).catch(error => {
+  wx.showToast({ title: error.message, icon: 'none' });
+});
+```
+
+### 内容安全检测
 
 ```javascript
 // 内容安全检测
@@ -167,9 +260,18 @@ if (await checkContent('用户输入的内容', 'user_openid')) {
 ### cURL测试
 
 ```bash
+# 测试微信小程序登录接口
+curl -X POST https://backen-access-token-abhs-wechat.vercel.app/api/auth/code2session \
+  -H "Content-Type: application/json" \
+  -d '{"code":"wx.login()获取的真实code"}'
+
+# 测试内容安全检测接口
 curl -X POST https://backen-access-token-abhs-wechat.vercel.app/api/security/text-check \
   -H "Content-Type: application/json" \
   -d '{"content":"测试内容","openid":"真实用户openid","scene":2}'
+
+# 测试健康检查接口
+curl -X GET https://backen-access-token-abhs-wechat.vercel.app/api/health
 ```
 
 ## 🛠️ 技术栈
