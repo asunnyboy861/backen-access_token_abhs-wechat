@@ -608,21 +608,21 @@ Page({
 */
 ```
 
-#### 3. 获取微信Access Token
+#### 3. 获取微信Access Token（智能缓存）
 ```javascript
-// 获取微信访问令牌
-apiRequest(API_CONFIG.ENDPOINTS.TOKEN, {
-  method: 'POST',
-  data: {
-    appid: 'your_wechat_appid',
-    secret: 'your_wechat_secret'
-  }
-})
+// 获取微信访问令牌（服务器自动处理缓存和刷新）
+apiRequest(API_CONFIG.ENDPOINTS.TOKEN)
 .then(res => {
-  if (res.data.errcode === 0) {
-    console.log('Token获取成功:', res.data.access_token);
-    // 存储token
-    wx.setStorageSync('access_token', res.data.access_token);
+  if (res.data.success) {
+    const { access_token, expires_in, from_cache } = res.data.data;
+    console.log('Token获取成功:', access_token.substring(0, 20) + '***');
+    console.log('剩余有效时间:', expires_in, '秒');
+    console.log('来源:', from_cache ? '服务器缓存' : '微信API新获取');
+    
+    // ⚠️ 注意：前端通常不需要存储access_token
+    // 因为内容安全检测等接口会自动获取最新的token
+    // 如果确实需要存储，建议存储到全局变量而非本地存储
+    getApp().globalData.access_token = access_token;
   }
 })
 .catch(err => {
@@ -732,10 +732,49 @@ wx.login({
 | -1 | 系统繁忙 | 提示稍后重试 |
 
 ### 3. 获取访问令牌接口
-- **URL**: `POST /api/auth/token`
+- **URL**: `GET /api/auth/token`
 - **功能**: 获取微信小程序access_token
-- **参数**: `appid`, `secret`
+- **缓存机制**: ⚡ **智能缓存** - 2小时有效期，提前5分钟自动刷新
+- **调用频率**: 微信官方限制每日2000次，本服务已实现缓存优化
 - **返回**: access_token和过期时间
+
+#### 🔄 缓存策略详情
+- **缓存时长**: Access Token有效期2小时（7200秒）
+- **提前刷新**: 提前5分钟（300秒）自动获取新token
+- **智能判断**: 服务器自动判断是否需要刷新，前端无需关心
+- **成本优化**: 大幅减少对微信API的调用次数，避免频率限制
+
+#### 请求示例
+```javascript
+// 获取Access Token（服务器会自动处理缓存）
+apiRequest(API_CONFIG.ENDPOINTS.TOKEN)
+.then(res => {
+  if (res.data.success) {
+    const { access_token, expires_in, from_cache } = res.data.data;
+    console.log('Token获取成功:', access_token.substring(0, 20) + '***');
+    console.log('剩余有效时间:', expires_in, '秒');
+    console.log('来源:', from_cache ? '缓存' : '新获取');
+    
+    // 注意：前端通常不需要存储access_token
+    // 内容安全检测等接口会自动获取最新token
+  }
+})
+.catch(err => {
+  console.error('Token获取失败:', err);
+});
+```
+
+#### 返回参数
+```json
+{
+  "success": true,
+  "data": {
+    "access_token": "微信访问令牌",
+    "expires_in": 7200,
+    "from_cache": true
+  }
+}
+```
 
 ### 4. 文本内容安全检测接口
 - **URL**: `POST /api/security/text-check`
@@ -761,10 +800,8 @@ curl -X POST https://backend-abhs.zzoutuo.com/api/auth/code2session \
   -H "Content-Type: application/json" \
   -d '{"code": "wx_login_code"}'
 
-# 3. 获取Token
-curl -X POST https://backend-abhs.zzoutuo.com/api/auth/token \
-  -H "Content-Type: application/json" \
-  -d '{"appid":"your_appid","secret":"your_secret"}'
+# 3. 获取Access Token（智能缓存）
+curl https://backend-abhs.zzoutuo.com/api/auth/token
 
 # 4. 内容检测
 curl -X POST https://backend-abhs.zzoutuo.com/api/security/text-check \
