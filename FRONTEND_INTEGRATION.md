@@ -83,10 +83,17 @@ apiRequest(API_CONFIG.ENDPOINTS.HEALTH)
 
 #### 2. 微信小程序用户登录（code2Session）
 
-> 📖 **登录流程说明**：根据微信官方文档，小程序登录需要前端获取临时登录凭证code，然后由后端调用微信接口换取用户信息
+> 📖 **登录流程说明**：根据微信官方文档，小程序登录需要前端获取临时登录凭证code，然后由后端调用微信接口换取用户信息 <mcreference link="https://developers.weixin.qq.com/miniprogram/dev/OpenApiDoc/user-login/code2Session.html" index="1">1</mcreference> <mcreference link="https://blog.csdn.net/UchihaItachi1/article/details/105574452" index="2">2</mcreference>
+
+**🔄 完整登录流程**：
+1. **检查登录态** → `wx.checkSession()` 检查当前登录是否有效
+2. **获取登录凭证** → `wx.login()` 获取临时登录凭证code（5分钟有效，仅用一次）
+3. **后端验证** → 调用后端 `/api/auth/code2session` 接口
+4. **获取用户信息** → 后端调用微信官方API换取openid和session_key
+5. **缓存用户信息** → 将openid等信息存储到本地
 
 ```javascript
-// 微信小程序登录流程（符合官方规范）
+// 🎯 推荐的登录实现（完全符合微信官方规范）
 const wxLogin = () => {
   return new Promise((resolve, reject) => {
     // 第一步：检查当前登录态
@@ -94,9 +101,16 @@ const wxLogin = () => {
       success: () => {
         // 登录态有效，检查本地是否有用户信息
         const openid = wx.getStorageSync('openid');
-        if (openid) {
+        const loginTime = wx.getStorageSync('loginTime');
+        
+        // 检查本地缓存是否有效（建议24小时内有效）
+        if (openid && loginTime && (Date.now() - loginTime < 24 * 60 * 60 * 1000)) {
           console.log('✅ 登录态有效，使用缓存信息');
-          resolve({ openid, unionid: wx.getStorageSync('unionid') });
+          resolve({ 
+            openid, 
+            unionid: wx.getStorageSync('unionid'),
+            fromCache: true 
+          });
           return;
         }
       },
@@ -113,40 +127,77 @@ const wxLogin = () => {
               // 第三步：调用后端code2Session接口
               apiRequest(API_CONFIG.ENDPOINTS.CODE2SESSION, {
                 method: 'POST',
-                data: { code: loginRes.code }
+                data: { code: loginRes.code },
+                timeout: 10000 // 设置10秒超时
               })
               .then(res => {
-                if (res.data.success && res.data.data.openid) {
+                console.log('🔍 后端响应:', res.statusCode, res.data);
+                
+                if (res.statusCode === 200 && res.data.success && res.data.data.openid) {
                   // 登录成功，保存用户信息
                   const { openid, unionid } = res.data.data;
+                  const loginTime = Date.now();
+                  
+                  // 安全存储用户信息
                   wx.setStorageSync('openid', openid);
+                  wx.setStorageSync('loginTime', loginTime);
                   if (unionid) {
                     wx.setStorageSync('unionid', unionid);
                   }
+                  
                   console.log('✅ 登录成功，openid:', openid.substring(0, 8) + '***');
-                  resolve(res.data.data);
+                  resolve({ openid, unionid, fromCache: false });
+                  
                 } else {
-                  console.error('❌ 登录失败:', res.data.message);
-                  reject(new Error(res.data.message || '登录失败'));
+                  // 处理业务错误
+                  const errorMsg = res.data.message || '登录失败';
+                  const errcode = res.data.errcode;
+                  
+                  console.error('❌ 登录失败:', errorMsg, 'errcode:', errcode);
+                  
+                  // 根据错误码提供具体的错误处理
+                  let userFriendlyMsg = errorMsg;
+                  switch(errcode) {
+                    case 40029:
+                      userFriendlyMsg = '登录凭证已失效，请重新尝试';
+                      break;
+                    case 45011:
+                      userFriendlyMsg = '登录请求过于频繁，请稍后再试';
+                      break;
+                    case 40226:
+                      userFriendlyMsg = '账号存在风险，请联系客服';
+                      break;
+                    case -1:
+                      userFriendlyMsg = '微信服务繁忙，请稍后重试';
+                      break;
+                  }
+                  
+                  reject(new Error(userFriendlyMsg));
                 }
               })
               .catch(err => {
                 console.error('❌ 登录请求失败:', err);
-                // 根据错误类型提供不同的处理建议
-                if (err.errMsg && err.errMsg.includes('timeout')) {
-                  reject(new Error('网络超时，请检查网络连接'));
-                } else {
-                  reject(new Error('登录服务异常，请稍后重试'));
+                
+                // 网络错误处理
+                let errorMessage = '登录服务异常，请稍后重试';
+                if (err.errMsg) {
+                  if (err.errMsg.includes('timeout')) {
+                    errorMessage = '网络超时，请检查网络连接后重试';
+                  } else if (err.errMsg.includes('fail')) {
+                    errorMessage = '网络连接失败，请检查网络设置';
+                  }
                 }
+                
+                reject(new Error(errorMessage));
               });
             } else {
               console.error('❌ 获取登录凭证失败:', loginRes.errMsg);
-              reject(new Error('获取登录凭证失败'));
+              reject(new Error('获取登录凭证失败，请重试'));
             }
           },
           fail: (error) => {
             console.error('❌ wx.login调用失败:', error);
-            reject(new Error('微信登录服务异常'));
+            reject(new Error('微信登录服务异常，请检查小程序权限'));
           }
         });
       }
@@ -154,45 +205,160 @@ const wxLogin = () => {
   });
 };
 
-// 在app.js中使用（完整的登录态管理）
-App({
-  onLaunch() {
-    this.doLogin();
-  },
-  
-  async doLogin() {
+// 🛡️ 带重试机制的安全登录函数
+const safeWxLogin = async (maxRetries = 3) => {
+  for (let i = 0; i < maxRetries; i++) {
     try {
-      wx.showLoading({ title: '登录中...' });
-      const userInfo = await wxLogin();
-      this.globalData.userInfo = userInfo;
-      
-      // 登录成功后的处理
-      console.log('🎉 应用启动登录成功');
-      wx.hideLoading();
-      
+      const result = await wxLogin();
+      return result;
     } catch (error) {
-      wx.hideLoading();
-      console.error('应用启动登录失败:', error.message);
+      console.log(`🔄 登录重试 ${i + 1}/${maxRetries}:`, error.message);
       
-      // 根据错误类型显示不同提示
-      let title = '登录失败';
-      if (error.message.includes('网络')) {
-        title = '网络异常，请检查网络连接';
-      } else if (error.message.includes('频繁')) {
-        title = '请求过于频繁，请稍后重试';
+      // 某些错误不需要重试
+      if (error.message.includes('账号存在风险') || 
+          error.message.includes('登录凭证已失效')) {
+        throw error;
       }
       
-      wx.showToast({
-        title,
-        icon: 'none',
-        duration: 3000
-      });
+      // 最后一次重试失败
+      if (i === maxRetries - 1) {
+        throw new Error(`登录失败，已重试${maxRetries}次: ${error.message}`);
+      }
       
-      // 可以设置重试机制
-      setTimeout(() => {
-        this.doLogin();
-      }, 5000);
+      // 延迟重试（递增延迟）
+      await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
     }
+  }
+};
+
+// 🎯 在app.js中使用（企业级登录态管理）
+App({
+  onLaunch() {
+    console.log('🚀 小程序启动，开始初始化登录');
+    this.initLogin();
+  },
+  
+  onShow() {
+    // 小程序从后台进入前台时，检查登录态
+    this.checkAndRefreshLogin();
+  },
+  
+  // 🔄 初始化登录（静默登录，不显示loading）
+  async initLogin() {
+    try {
+      const userInfo = await safeWxLogin();
+      this.globalData.userInfo = userInfo;
+      
+      if (userInfo.fromCache) {
+        console.log('✅ 使用缓存登录信息，应用启动完成');
+      } else {
+        console.log('🎉 新登录成功，应用启动完成');
+      }
+      
+      // 触发登录成功事件
+      this.triggerLoginSuccess(userInfo);
+      
+    } catch (error) {
+      console.error('❌ 应用启动登录失败:', error.message);
+      this.handleLoginError(error, false); // 静默处理错误
+    }
+  },
+  
+  // 🔍 检查并刷新登录态（从后台切换到前台时）
+  async checkAndRefreshLogin() {
+    const lastCheckTime = this.globalData.lastLoginCheck || 0;
+    const now = Date.now();
+    
+    // 5分钟内检查过就不重复检查
+    if (now - lastCheckTime < 5 * 60 * 1000) {
+      return;
+    }
+    
+    this.globalData.lastLoginCheck = now;
+    
+    try {
+      await this.ensureLogin();
+    } catch (error) {
+      console.log('⚠️ 后台切换时登录检查失败:', error.message);
+    }
+  },
+  
+  // 🛡️ 确保登录态有效（供页面调用）
+  async ensureLogin(showLoading = true) {
+    if (showLoading) {
+      wx.showLoading({ title: '验证登录中...', mask: true });
+    }
+    
+    try {
+      const userInfo = await safeWxLogin();
+      this.globalData.userInfo = userInfo;
+      
+      if (showLoading) {
+        wx.hideLoading();
+      }
+      
+      return userInfo;
+      
+    } catch (error) {
+      if (showLoading) {
+        wx.hideLoading();
+      }
+      
+      this.handleLoginError(error, showLoading);
+      throw error;
+    }
+  },
+  
+  // 🚨 统一的登录错误处理
+  handleLoginError(error, showToast = true) {
+    console.error('登录错误详情:', error);
+    
+    if (!showToast) return;
+    
+    // 根据错误类型显示不同提示
+    let title = '登录失败';
+    let icon = 'none';
+    let duration = 3000;
+    
+    if (error.message.includes('网络')) {
+      title = '网络异常，请检查网络连接';
+      icon = 'none';
+    } else if (error.message.includes('频繁')) {
+      title = '请求过于频繁，请稍后重试';
+      icon = 'none';
+      duration = 5000;
+    } else if (error.message.includes('风险')) {
+      title = '账号存在风险，请联系客服';
+      icon = 'none';
+      duration = 5000;
+    } else if (error.message.includes('权限')) {
+      title = '请检查小程序权限设置';
+      icon = 'none';
+    }
+    
+    wx.showToast({ title, icon, duration });
+  },
+  
+  // 🎉 登录成功事件处理
+  triggerLoginSuccess(userInfo) {
+    // 可以在这里添加登录成功后的业务逻辑
+    // 例如：上报用户行为、初始化用户数据等
+    
+    // 发送自定义事件通知页面
+    if (typeof this.onLoginSuccess === 'function') {
+      this.onLoginSuccess(userInfo);
+    }
+  },
+  
+  // 🔄 手动重新登录（供页面调用）
+  async forceLogin() {
+    // 清除本地缓存
+    wx.removeStorageSync('openid');
+    wx.removeStorageSync('unionid');
+    wx.removeStorageSync('loginTime');
+    
+    // 重新登录
+    return this.ensureLogin(true);
   },
   
   // 检查登录态的工具方法
@@ -216,23 +382,230 @@ App({
   }
 });
 
-// 页面中使用登录态检查
-// pages/index/index.js
-Page({
-  onLoad() {
-    this.ensureLogin();
-  },
-  
-  async ensureLogin() {
-    try {
-      await getApp().checkLoginStatus();
-      console.log('✅ 登录态有效');
-    } catch (error) {
-      console.log('⚠️ 需要重新登录:', error.message);
-      await getApp().doLogin();
-    }
+  globalData: {
+    userInfo: null,
+    lastLoginCheck: 0
   }
 });
+
+// 🎯 页面中使用登录态（完整示例）
+// pages/index/index.js
+Page({
+  data: {
+    userInfo: null,
+    isLoggedIn: false,
+    loginLoading: false
+  },
+  
+  onLoad() {
+    console.log('📄 页面加载，检查登录态');
+    this.initPageLogin();
+  },
+  
+  onShow() {
+    // 页面显示时检查登录态变化
+    this.checkLoginChange();
+  },
+  
+  // 🔄 页面初始化登录检查
+  async initPageLogin() {
+    try {
+      // 先检查全局登录状态
+      const app = getApp();
+      if (app.globalData.userInfo && app.globalData.userInfo.openid) {
+        this.setData({
+          userInfo: app.globalData.userInfo,
+          isLoggedIn: true
+        });
+        console.log('✅ 使用全局登录信息');
+        return;
+      }
+      
+      // 确保登录态有效
+      await this.ensureLogin();
+      
+    } catch (error) {
+      console.error('页面登录初始化失败:', error.message);
+      this.handlePageLoginError(error);
+    }
+  },
+  
+  // 🛡️ 确保页面登录态
+  async ensureLogin(showLoading = false) {
+    if (showLoading) {
+      this.setData({ loginLoading: true });
+    }
+    
+    try {
+      const app = getApp();
+      const userInfo = await app.ensureLogin(showLoading);
+      
+      this.setData({
+        userInfo,
+        isLoggedIn: true,
+        loginLoading: false
+      });
+      
+      console.log('✅ 页面登录态确认有效');
+      return userInfo;
+      
+    } catch (error) {
+      this.setData({
+        userInfo: null,
+        isLoggedIn: false,
+        loginLoading: false
+      });
+      
+      throw error;
+    }
+  },
+  
+  // 🔍 检查登录态变化
+  checkLoginChange() {
+    const app = getApp();
+    const globalUserInfo = app.globalData.userInfo;
+    const currentUserInfo = this.data.userInfo;
+    
+    // 检查登录状态是否发生变化
+    if (globalUserInfo && globalUserInfo.openid !== (currentUserInfo && currentUserInfo.openid)) {
+      console.log('🔄 检测到登录态变化，更新页面状态');
+      this.setData({
+        userInfo: globalUserInfo,
+        isLoggedIn: true
+      });
+    } else if (!globalUserInfo && currentUserInfo) {
+      console.log('⚠️ 检测到登录态失效，清除页面状态');
+      this.setData({
+        userInfo: null,
+        isLoggedIn: false
+      });
+    }
+  },
+  
+  // 🚨 页面登录错误处理
+  handlePageLoginError(error) {
+    console.error('页面登录错误:', error.message);
+    
+    // 显示错误提示
+    wx.showModal({
+      title: '登录提示',
+      content: error.message || '登录失败，请重试',
+      showCancel: true,
+      cancelText: '稍后再试',
+      confirmText: '重新登录',
+      success: (res) => {
+        if (res.confirm) {
+          this.handleRetryLogin();
+        }
+      }
+    });
+  },
+  
+  // 🔄 重试登录
+  async handleRetryLogin() {
+    try {
+      await this.ensureLogin(true);
+      wx.showToast({
+        title: '登录成功',
+        icon: 'success'
+      });
+    } catch (error) {
+      this.handlePageLoginError(error);
+    }
+  },
+  
+  // 🎯 需要登录的业务操作示例
+  async doSomethingNeedLogin() {
+    try {
+      // 确保登录态有效
+      await this.ensureLogin();
+      
+      // 执行需要登录的业务逻辑
+      const { apiRequest, API_CONFIG } = require('../../utils/api');
+      
+      const result = await apiRequest('/api/some-business-api', {
+        method: 'POST',
+        data: {
+          openid: this.data.userInfo.openid,
+          // 其他业务参数
+        }
+      });
+      
+      console.log('✅ 业务操作成功:', result.data);
+      
+    } catch (error) {
+      console.error('❌ 业务操作失败:', error.message);
+      
+      if (error.message.includes('登录')) {
+        this.handlePageLoginError(error);
+      } else {
+        wx.showToast({
+          title: error.message || '操作失败',
+          icon: 'none'
+        });
+      }
+    }
+  },
+  
+  // 📱 用户手动登录按钮
+  onLoginTap() {
+    this.handleRetryLogin();
+  },
+  
+  // 🚪 用户登出
+  async onLogoutTap() {
+    wx.showModal({
+      title: '确认登出',
+      content: '确定要退出登录吗？',
+      success: async (res) => {
+        if (res.confirm) {
+          // 清除登录信息
+          const app = getApp();
+          app.globalData.userInfo = null;
+          
+          wx.removeStorageSync('openid');
+          wx.removeStorageSync('unionid');
+          wx.removeStorageSync('loginTime');
+          
+          this.setData({
+            userInfo: null,
+            isLoggedIn: false
+          });
+          
+          wx.showToast({
+            title: '已退出登录',
+            icon: 'success'
+          });
+        }
+      }
+    });
+  }
+});
+
+// 🎯 页面WXML模板示例
+/*
+<view class="container">
+  <!-- 登录状态显示 -->
+  <view wx:if="{{isLoggedIn}}" class="user-info">
+    <text>✅ 已登录</text>
+    <text>OpenID: {{userInfo.openid}}</text>
+    <button bindtap="onLogoutTap" size="mini">退出登录</button>
+  </view>
+  
+  <!-- 未登录状态 -->
+  <view wx:else class="login-prompt">
+    <text>⚠️ 未登录</text>
+    <button bindtap="onLoginTap" loading="{{loginLoading}}" disabled="{{loginLoading}}">
+      {{loginLoading ? '登录中...' : '立即登录'}}
+    </button>
+  </view>
+  
+  <!-- 需要登录的功能按钮 -->
+  <button bindtap="doSomethingNeedLogin" disabled="{{!isLoggedIn}}">
+    执行需要登录的操作
+  </button>
+</view>
+*/
 ```
 
 #### 3. 获取微信Access Token
