@@ -8,7 +8,7 @@
 
 ## 📡 已部署的API服务
 
-**生产环境地址**: `https://backend-abhs.zzoutuo.com`
+**生产环境地址**: `https://your-backend-domain.com`
 
 **服务状态**: ✅ 已成功部署并运行中
 
@@ -28,7 +28,7 @@
 在微信公众平台 > 开发管理 > 开发设置 > 服务器域名中添加：
 
 ```
-request合法域名: https://backend-abhs.zzoutuo.com
+request合法域名: https://your-backend-domain.com
 ```
 
 #### 第二步：在小程序中创建API配置文件
@@ -38,7 +38,7 @@ request合法域名: https://backend-abhs.zzoutuo.com
 ```javascript
 // utils/api.js - API配置文件（原生小程序）
 const API_CONFIG = {
-  BASE_URL: 'https://backend-abhs.zzoutuo.com',
+  BASE_URL: 'https://your-backend-domain.com',
   ENDPOINTS: {
     HEALTH: '/api/health',
     TOKEN: '/api/auth/token', 
@@ -126,7 +126,7 @@ export interface TextCheckResponse {
 }
 
 export const API_CONFIG = {
-  BASE_URL: 'https://backend-abhs.zzoutuo.com',
+  BASE_URL: 'https://your-backend-domain.com',
   ENDPOINTS: {
     HEALTH: '/api/health',
     TOKEN: '/api/auth/token',
@@ -1165,7 +1165,7 @@ const testTextCheck = async () => {
        LOG_LEVEL: 'debug'
      },
      production: {
-       API_BASE_URL: 'https://backend-abhs.zzoutuo.com',
+       API_BASE_URL: 'https://your-backend-domain.com',
        DEBUG: false,
        LOG_LEVEL: 'error'
      }
@@ -1972,18 +1972,18 @@ apiRequest(API_CONFIG.ENDPOINTS.TOKEN)
 
 ```bash
 # 1. 健康检查
-curl https://backend-abhs.zzoutuo.com/api/health
+curl https://your-backend-domain.com/api/health
 
 # 2. 用户登录（code2Session）
-curl -X POST https://backend-abhs.zzoutuo.com/api/auth/code2session \
+curl -X POST https://your-backend-domain.com/api/auth/code2session \
   -H "Content-Type: application/json" \
   -d '{"code": "wx_login_code"}'
 
 # 3. 获取Access Token（智能缓存）
-curl https://backend-abhs.zzoutuo.com/api/auth/token
+curl https://your-backend-domain.com/api/auth/token
 
 # 4. 内容检测
-curl -X POST https://backend-abhs.zzoutuo.com/api/security/text-check \
+curl -X POST https://your-backend-domain.com/api/security/text-check \
   -H "Content-Type: application/json" \
   -d '{
     "content": "测试内容",
@@ -2164,8 +2164,8 @@ const monitorLogin = async () => {
 
 ## 🔗 相关资源
 
-- **API服务地址**: https://backend-abhs.zzoutuo.com
-- **健康检查**: https://backend-abhs.zzoutuo.com/api/health
+- **API服务地址**: https://your-backend-domain.com
+- **健康检查**: https://your-backend-domain.com/api/health
 - **GitHub仓库**: https://github.com/asunnyboy861/backen-access_token_abhs-wechat
 - **微信小程序登录官方文档**: https://developers.weixin.qq.com/miniprogram/dev/framework/open-ability/login.html
 - **code2Session接口文档**: https://developers.weixin.qq.com/miniprogram/dev/OpenApiDoc/user-login/code2Session.html

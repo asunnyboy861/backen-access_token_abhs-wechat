@@ -5,7 +5,7 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-ES2023-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org)
 [![WeChat](https://img.shields.io/badge/WeChat-API_2025-07C160?style=for-the-badge&logo=wechat&logoColor=white)](https://developers.weixin.qq.com)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge)](./LICENSE)
-[![Deploy](https://img.shields.io/badge/Deploy-Live-brightgreen.svg?style=for-the-badge)](https://backend-abhs.zzoutuo.com)
+[![Deploy](https://img.shields.io/badge/Deploy-Live-brightgreen.svg?style=for-the-badge)](https://your-backend-domain.com)
 
 > 🚀 **企业级微信小程序后端API服务** - 基于Vercel Serverless Functions，符合2025年最新技术标准和微信官方规范
 
@@ -157,13 +157,13 @@ POST /api/security/text-check
 WECHAT_APP_ID=你的小程序AppID
 WECHAT_APP_SECRET=你的小程序AppSecret
 ```
-4️⃣ **部署完成** → 获得生产域名 `https://backend-abhs.zzoutuo.com`
+4️⃣ **部署完成** → 获得生产域名 `https://your-backend-domain.com`
 
 ### 🎯 在线演示
 
-**🌐 部署地址**: [https://backend-abhs.zzoutuo.com](https://backend-abhs.zzoutuo.com)  
+**🌐 部署地址**: [https://your-backend-domain.com](https://your-backend-domain.com)  
 **📋 API测试**: 访问上述地址可进行在线API测试  
-**📊 服务状态**: [健康检查接口](https://backend-abhs.zzoutuo.com/api/health)
+**📊 服务状态**: [健康检查接口](https://your-backend-domain.com/api/health)
 
 ### 本地开发（可选）
 
@@ -186,8 +186,8 @@ npm run dev
 ## 📚 详细文档
 
 - 📖 [前端集成指南](./FRONTEND_INTEGRATION.md) - 详细的前端集成步骤和代码示例（2025年最新版）
-- 🔧 [在线API文档](https://backend-abhs.zzoutuo.com) - 在线API文档和测试页面
-- 📊 [服务健康检查](https://backend-abhs.zzoutuo.com/api/health) - 实时服务状态监控
+- 🔧 [在线API文档](https://your-backend-domain.com) - 在线API文档和测试页面
+- 📊 [服务健康检查](https://your-backend-domain.com/api/health) - 实时服务状态监控
 - 🎯 [uni-app+Vue3集成](./FRONTEND_INTEGRATION.md#uni-app--vue3-框架接入) - 现代化前端框架集成
 - 📱 [原生小程序集成](./FRONTEND_INTEGRATION.md#原生微信小程序接入指南) - 传统小程序开发集成
 
@@ -206,7 +206,7 @@ const wxLogin = async () => {
     }
     
     // 2. 调用后端code2session接口
-    const response = await fetch('https://backend-abhs.zzoutuo.com/api/auth/code2session', {
+    const response = await fetch('https://your-backend-domain.com/api/auth/code2session', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ code: loginRes.code })
@@ -242,7 +242,7 @@ wxLogin().then(userInfo => {
 ```javascript
 // 内容安全检测（2025年最新版本）
 const checkContent = async (content, openid) => {
-  const response = await fetch('https://backend-abhs.zzoutuo.com/api/security/text-check', {
+  const response = await fetch('https://your-backend-domain.com/api/security/text-check', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -270,20 +270,20 @@ if (await checkContent('用户输入的内容', 'user_openid')) {
 
 ```bash
 # 测试微信小程序登录接口
-curl -X POST https://backend-abhs.zzoutuo.com/api/auth/code2session \
+curl -X POST https://your-backend-domain.com/api/auth/code2session \
   -H "Content-Type: application/json" \
   -d '{"code":"wx.login()获取的真实code"}'
 
 # 测试内容安全检测接口（2025年最新版本）
-curl -X POST https://backend-abhs.zzoutuo.com/api/security/text-check \
+curl -X POST https://your-backend-domain.com/api/security/text-check \
   -H "Content-Type: application/json" \
   -d '{"content":"测试内容","openid":"真实用户openid","scene":2,"version":2}'
 
 # 测试获取Access Token接口
-curl -X GET https://backend-abhs.zzoutuo.com/api/auth/token
+curl -X GET https://your-backend-domain.com/api/auth/token
 
 # 测试健康检查接口
-curl -X GET https://backend-abhs.zzoutuo.com/api/health
+curl -X GET https://your-backend-domain.com/api/health
 ```
 
 ## 🚀 2025年新特性亮点
