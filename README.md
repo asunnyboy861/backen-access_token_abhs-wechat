@@ -148,6 +148,7 @@ POST /api/security/text-check
 
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/asunnyboy861/backen-access_token_abhs-wechat)
 
+
 ### 手动部署步骤
 
 1️⃣ **Fork项目** → 点击右上角Fork按钮  
@@ -157,6 +158,8 @@ POST /api/security/text-check
 WECHAT_APP_ID=你的小程序AppID
 WECHAT_APP_SECRET=你的小程序AppSecret
 ```
+<img width="853" height="680" alt="图片" src="https://github.com/user-attachments/assets/9a17245f-40a3-48ad-9f0b-37bfb9db4efb" />
+
 4️⃣ **部署完成** → 获得生产域名 `https://your-backend-domain.com`
 
 ### 🎯 在线演示
@@ -164,6 +167,8 @@ WECHAT_APP_SECRET=你的小程序AppSecret
 **🌐 部署地址**: [https://your-backend-domain.com](https://your-backend-domain.com)  
 **📋 API测试**: 访问上述地址可进行在线API测试  
 **📊 服务状态**: [健康检查接口](https://your-backend-domain.com/api/health)
+
+<img width="1453" height="872" alt="图片" src="https://github.com/user-attachments/assets/4161f132-f630-4003-a141-dff26fc2a605" />
 
 ### 本地开发（可选）
 
